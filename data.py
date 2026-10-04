@@ -23,8 +23,17 @@ def completed_rows(frame, metadata=None, now=None):
     today_rows = dates.date == local.date()
     end = ((metadata or {}).get('currentTradingPeriod', {}).get('regular', {}) or {}).get('end')
     completed = local.time().replace(tzinfo=None) >= time(16, 15)
-    if end and datetime.fromtimestamp(end, NY).date() == local.date():
-        completed = now.timestamp() >= end + 900
+    if end is not None:
+        # yfinance may return a timezone-aware Timestamp instead of Unix seconds.
+        if isinstance(end, (datetime, pd.Timestamp)):
+            trading_end = pd.Timestamp(end)
+            if trading_end.tzinfo is None:
+                trading_end = trading_end.tz_localize(NY)
+            end = trading_end.timestamp()
+        else:
+            end = float(end)
+        if datetime.fromtimestamp(end, NY).date() == local.date():
+            completed = now.timestamp() >= end + 900
     return frame.loc[~today_rows] if not completed else frame
 
 
